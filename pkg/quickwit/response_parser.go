@@ -116,7 +116,25 @@ func processLogsResponse(res *es.SearchResponse, target *Query, configuredFields
 	for hitIdx, hit := range res.Hits.Hits {
 		var flattened map[string]interface{}
 		if hit["_source"] != nil {
-			flattened = flatten(hit["_source"].(map[string]interface{}))
+			source := hit["_source"].(map[string]interface{})
+			flattened = flatten(source)
+
+			// If configured log fields were JSON objects, flatten() expanded them
+			// into dot-notated sub-keys, destroying the original key.
+			// Re-inject the original value as a serialized JSON string.
+			fieldsToPreserve := []string{configuredFields.LogMessageField, configuredFields.LogLevelField}
+			for _, fieldName := range fieldsToPreserve {
+				if fieldName == "" {
+					continue
+				}
+				if _, exists := flattened[fieldName]; !exists {
+					if originalValue, ok := source[fieldName]; ok {
+						if jsonBytes, err := json.Marshal(originalValue); err == nil {
+							flattened[fieldName] = string(jsonBytes)
+						}
+					}
+				}
+			}
 		}
 
 		doc := map[string]interface{}{

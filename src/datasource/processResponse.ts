@@ -35,28 +35,31 @@ export function processLogsDataFrame(datasource: BaseQuickwitDataSource, dataFra
         field_idx_list.push(field_idx);
       }
     }
-    const displayedMessages = Array(dataFrame.length);
-    for (let idx = 0; idx < dataFrame.length; idx++) {
-      let displayedMessage = "";
-      // If we have only one field, we assume the field name is obvious for the user and we don't need to show it.
-      if (field_idx_list.length === 1) {
-        displayedMessage = `${dataFrame.fields[field_idx_list[0]].values[idx]}`;
-      } else {
-        for (const field_idx of field_idx_list) {
-          displayedMessage += ` ${dataFrame.fields[field_idx].name}=${dataFrame.fields[field_idx].values[idx]}`;
-        }
-      }
-      displayedMessages[idx] = displayedMessage.trim();
-    }
 
-    const newField: Field = {
-      name: getCustomFieldName('message'),
-      type: FieldType.string,
-      config: {},
-      values: displayedMessages,
-    };
-    const [timestamp, ...rest] = dataFrame.fields;
-    dataFrame.fields = [timestamp, newField, ...rest];
+    if (field_idx_list.length > 0) {
+      const displayedMessages = Array(dataFrame.length);
+      for (let idx = 0; idx < dataFrame.length; idx++) {
+        let displayedMessage = "";
+        // If we have only one field, we assume the field name is obvious for the user and we don't need to show it.
+        if (field_idx_list.length === 1) {
+          displayedMessage = `${dataFrame.fields[field_idx_list[0]].values[idx]}`;
+        } else {
+          for (const field_idx of field_idx_list) {
+            displayedMessage += ` ${dataFrame.fields[field_idx].name}=${dataFrame.fields[field_idx].values[idx]}`;
+          }
+        }
+        displayedMessages[idx] = displayedMessage.trim();
+      }
+
+      const newField: Field = {
+        name: getCustomFieldName('message'),
+        type: FieldType.string,
+        config: {},
+        values: displayedMessages,
+      };
+      const [timestamp, ...rest] = dataFrame.fields;
+      dataFrame.fields = [timestamp, newField, ...rest];
+    }
   }
 
   if (!datasource.dataLinks.length) {

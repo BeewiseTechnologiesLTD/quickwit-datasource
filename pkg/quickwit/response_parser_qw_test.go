@@ -277,4 +277,76 @@ func TestProcessLogsResponseWithDifferentTimeOutputFormat(t *testing.T) {
 		require.Equal(t, data.FieldTypeNullableTime, logsFieldMap["testtime"].Type())
 		require.Equal(t, &expectedTimeValue, logsFieldMap["testtime"].At(0))
 	})
+
+	t.Run("Log query with JSON message field preserves serialized JSON", func(t *testing.T) {
+		query := []byte(`
+				[
+					{
+					  "refId": "A",
+					  "metrics": [{ "type": "logs"}],
+					  "bucketAggs": [
+						{
+						  "type": "date_histogram",
+						  "settings": { "interval": "auto" },
+						  "id": "2"
+						}
+					  ],
+					  "key": "Q-1561369883389-0.7611823271062786-0",
+					  "query": "hello AND message",
+						"sort":[{"testtime":"desc"}]
+					}
+				]
+			`)
+
+		response := []byte(`
+				{
+					"responses": [
+					  {
+						"aggregations": {},
+						"hits": {
+						  "hits": [
+							{
+							  "_id": "fdsfs",
+							  "_type": "_doc",
+							  "_index": "mock-index",
+							  "_source": {
+								"testtime": 1684398201000000000,
+								"host": "djisaodjsoad",
+								"payload": {"msg": "hello world", "code": 200},
+								"level": "debug"
+							  },
+								"sort":[1684398201000000000]
+							}
+						  ]
+						}
+					  }
+					]
+				}
+			`)
+
+		configuredFields := es.ConfiguredFields{
+			TimeOutputFormat: TimestampNanos,
+			TimeField:        "testtime",
+			LogMessageField:  "payload",
+			LogLevelField:    "lvl",
+		}
+		result, _ := queryDataTestWithResponseCode(query, 200, response, configuredFields)
+		frames := result.response.Responses["A"].Frames
+		logsFrame := frames[0]
+		logsFieldMap := make(map[string]*data.Field)
+		for _, field := range logsFrame.Fields {
+			logsFieldMap[field.Name] = field
+		}
+
+		// The "payload" field should exist as a string containing serialized JSON
+		require.Contains(t, logsFieldMap, "payload")
+		payloadField := logsFieldMap["payload"]
+		require.Equal(t, data.FieldTypeNullableString, payloadField.Type())
+		payloadValue := payloadField.At(0).(*string)
+		require.NotNil(t, payloadValue)
+		// The serialized JSON should contain both sub-fields
+		require.Contains(t, *payloadValue, "hello world")
+		require.Contains(t, *payloadValue, "200")
+	})
 }
+
